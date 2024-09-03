@@ -34,9 +34,10 @@ class CompletionResponse:
         self.answer = answer
 
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
-     llm_type = "Mistral"                                                                                                                                                                                     
-     model = "open-mistral-nemo"                                                                                                                                                                              
-     emb_model ="mistral-embed"                                                                                                                                                                               
+     emb_llm_type = "OpenAI"
+     llm_type = "OpenAI"                                                                                                                                                                                     
+     model = "gpt-4o-mini"                                                                                                                                                                           
+     emb_model ="text-embedding-ada-002"
      logging.info(f"Starting chat completion with llm_type: {llm_type}, model: {model}")                                                                                                                      
      if len(req.chat) % 2 == 0:                                                                                                                                                                               
          logging.error("Chat completion error: chat must be a list of user,assistant messages ending with a user message")                                                                                    
@@ -44,7 +45,7 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
      question = req.chat[-1]                                                                                                                                                                                  
      logging.info(f"Processing question: {question}")                                                                                                                                                         
      logging.info(f"Namespace: {req.namespace}")                                                                                                                                                              
-     paragraphs, similarities, err = find_similar_paragraphs(question, 2, 0.6, req.namespace, llm_type=llm_type, model=emb_model)                                                                             
+     paragraphs, similarities, err = find_similar_paragraphs(question, 2, 0.7, req.namespace, emb_llm_type=emb_llm_type, model=emb_model)                                                                             
      if err:                                                                                                                                                                                                  
          logging.error(f"Error finding similar paragraphs: {err}")                                                                                                                                            
          return CompletionResponse(error=f"Error finding similar paragraphs: {err}")                                                                                                                          
@@ -86,13 +87,13 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
          logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
          return CompletionResponse(error=f"Error in chat completion: {str(e)}")
 
-def embed(llm_type, model, text):
+def embed(emb_llm_type, model, text):
     embeddings = None
-    logging.info(f"Attempting to embed text with {llm_type} model: {model}")
+    logging.info(f"Attempting to embed text with {emb_llm_type} model: {model}")
     logging.debug(f"Text to embed (first 50 chars): {text[:50]}...")
 
     # Initialize the language model based on the provided type
-    if llm_type == 'Mistral':
+    if emb_llm_type == 'Mistral':
         mistralai_api_key = os.getenv("MISTRAL_API_KEY")
         if not mistralai_api_key:
             logging.error("MISTRAL_API_KEY environment variable is not set")
@@ -106,7 +107,7 @@ def embed(llm_type, model, text):
         except Exception as e:
             logging.error(f"Error initializing MistralAIEmbeddings: {str(e)}")
             raise ValueError(f"Error initializing MistralAIEmbeddings: {str(e)}")
-    elif llm_type == 'OpenAI':
+    elif emb_llm_type == 'OpenAI':
         openai_api_key = os.getenv("OPENAI_API_KEY")
         if not openai_api_key:
             logging.error("OPENAI_API_KEY environment variable is not set")
@@ -121,8 +122,8 @@ def embed(llm_type, model, text):
             logging.error(f"Error initializing OpenAIEmbeddings: {str(e)}")
             raise ValueError(f"Error initializing OpenAIEmbeddings: {str(e)}")
     else:
-        logging.error(f"Unsupported llm_type: {llm_type}")
-        raise ValueError(f"Unsupported llm_type: {llm_type}")
+        logging.error(f"Unsupported llm_type: {emb_llm_type}")
+        raise ValueError(f"Unsupported llm_type: {emb_llm_type}")
 
     hf_token = os.getenv("HF_TOKEN")
     if hf_token:
@@ -131,19 +132,18 @@ def embed(llm_type, model, text):
 
     try:
         logging.info("Attempting to embed query")
-        print (text)
         single_vector = embeddings.embed_query(text)
-        logging.info(f"Successfully embedded text with {llm_type}")
+        logging.info(f"Successfully embedded text with {emb_llm_type}")
         logging.debug(f"Embedded vector (first 5 elements): {single_vector[:5]}")
         return single_vector
     except Exception as e:
-        logging.error(f"Error embedding text with {llm_type}: {str(e)}")
+        logging.error(f"Error embedding text with {emb_llm_type}: {str(e)}")
         logging.error(f"Error type: {type(e).__name__}")
         if hasattr(e, 'response'):
             logging.error(f"Response content: {e.response.content}")
         if hasattr(e, '__dict__'):
             logging.error(f"Error attributes: {e.__dict__}")
-        raise ValueError(f"Error embedding text with {llm_type}: {str(e)}")
+        raise ValueError(f"Error embedding text with {emb_llm_type}: {str(e)}")
 
 def connect_to_pinecone (index_name: str):
     pinecone_api_key = os.environ.get("PINECONE_API_KEY")
@@ -151,12 +151,12 @@ def connect_to_pinecone (index_name: str):
     index = pc.Index(index_name)
     return index
 
-def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namespace: str, llm_type: str, model: str) -> tuple:
+def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namespace: str, emb_llm_type: str, model: str) -> tuple:
     logging.info(f"Finding similar paragraphs for text: {text[:50]}...")
     try:
         index = connect_to_pinecone("langchain-test-index")
         logging.info("Connected to Pinecone index")
-        vec = embed(llm_type, model, text)
+        vec = embed(emb_llm_type, model, text)
         logging.info("Text embedded successfully")
         resp = index.query(
             vector=vec, 
@@ -180,4 +180,38 @@ def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namesp
         logging.error(f"Error in find_similar_paragraphs: {str(e)}")
         return [], [], str(e)
 
+def reply_to_prompt(prompt):
+
+    llm_type = "Groq"                                                                                                                                                                        
+    model = "llama-3.1-70b-versatile"
+    messages = [
+        {"role": "system", "content": "Sei un esperto di monitoraggio e valutazione che supporta le Organizzazioni non governative a scrivere il proprio bilancio sociale."},
+        {"role": "user", "content": prompt}
+    ]
+    # Initialize the language model based on the provided type                                                                                                                                               
+    if llm_type == 'Groq':                                                                                                                                                                                   
+        model_kwargs = {'seed': 26}                                                                                                                                                                          
+        llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)                                                                                       
+    elif llm_type == 'Deepseek':                                                                                                                                                                             
+        llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])                                                              
+    elif llm_type == 'Mistral':                                                                                                                                                                              
+        llm = ChatMistralAI(model_name=model, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])                                                                                                 
+    elif llm_type == 'OpenAI':                                                                                                                                                                               
+        llm = ChatOpenAI(model_name=model, temperature=0, seed=26, api_key=os.environ['OPENAI_API_KEY'])                                                                                                     
+                                                                                                                                                                                                              
+    try:                                                                                                                                                                                                     
+        resp = llm.invoke(messages)
+        print (resp.content)
+        return CompletionResponse(answer=resp.content)
+    except Exception as e:                                                                                                                                                                                   
+         logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
+         return CompletionResponse(error=f"Error in chat completion: {str(e)}")
+    #try:
+    #    response = openai.ChatCompletion.create(
+    #        model="gpt-3.5-turbo",  # Replace with your completion model
+    #        messages=messages
+    #    )
+    #   return response.choices[0].message.content
+    #except openai.OpenAIError as e:
+    #    raise Exception(f"Error computing chat completion: {e}")
 

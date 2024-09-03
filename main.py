@@ -13,6 +13,7 @@ from dino import dino_authenticate
 
 import ai 
 from ai import complete_chat, CompletionResponse
+from ai import reply_to_prompt
 
 # Import specific chat models from their respective libraries
 from langchain_groq.chat_models import ChatGroq
@@ -43,8 +44,9 @@ def add_headers(response):
 # Define a route for the '/' endpoint that returns a welcome message
 @app.route('/')
 def welcome():
-    return "Welcome to Pandino! This is the root endpoint."
-
+    return """
+    Welcome to Pandino! This is the root endpoint.
+    """
 def validate_api_key(api_key):
     if not api_key:
         abort(403)
@@ -153,6 +155,35 @@ def analyst():
         response_dict = {'type': type(response).__name__, 'value': str(response)}
 
     return jsonify({"response": response_dict, "explanation": explanation})
+
+@app.route('/prompt.txt', methods=['POST'])
+def prompt_handler():
+    graphql_url = request.form.get('graphqlUrl')
+    auth_token = request.form.get('authToken')
+    prompt = request.form.get('prompt')
+
+    if not graphql_url or not auth_token:
+        return jsonify({'error': 'Auth parameters not provided'}), 400
+    
+    try:
+        # Assuming DinoAuthenticate is replaced with a similar function in Python
+        dino_authenticate(graphql_url, auth_token)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+   
+    if not prompt:
+        return jsonify({'error': 'No prompt provided'}), 400
+    
+    try:
+        resp = reply_to_prompt(prompt)
+        if isinstance(resp, CompletionResponse):
+            return jsonify({
+                'answer': resp.answer
+            })
+        else:
+            return jsonify({'error': 'Unexpected response format'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Define a route for the '/summarize' endpoint that returns a "not yet implemented" message
 @app.route('/summarize', methods=['GET'])
