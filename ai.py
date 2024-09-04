@@ -35,8 +35,8 @@ class CompletionResponse:
 
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
      emb_llm_type = "OpenAI"
-     llm_type = "OpenAI"                                                                                                                                                                                     
-     model = "gpt-4o-mini"                                                                                                                                                                           
+     llm_type = "OpenAI" 
+     model = "gpt-4o-mini"
      emb_model ="text-embedding-ada-002"
      logging.info(f"Starting chat completion with llm_type: {llm_type}, model: {model}")                                                                                                                      
      if len(req.chat) % 2 == 0:                                                                                                                                                                               
@@ -69,11 +69,11 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
          messages.append({"role": role, "content": msg})                                                                                                                                                      
                                                                                                                                                                                                               
      # Initialize the language model based on the provided type                                                                                                                                               
-     if llm_type == 'Groq':                                                                                                                                                                                   
-         model_kwargs = {'seed': 26}                                                                                                                                                                          
-         llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)                                                                                       
-     elif llm_type == 'Deepseek':                                                                                                                                                                             
-         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])                                                              
+     if llm_type == 'Groq': 
+         model_kwargs = {'seed': 26}
+         llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)
+     elif llm_type == 'Deepseek': 
+         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY']) 
      elif llm_type == 'Mistral':                                                                                                                                                                              
          llm = ChatMistralAI(model_name=model, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])                                                                                                 
      elif llm_type == 'OpenAI':                                                                                                                                                                               
@@ -194,7 +194,7 @@ def reply_to_prompt(prompt):
         llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)                                                                                       
     elif llm_type == 'Deepseek':                                                                                                                                                                             
         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])                                                              
-    elif llm_type == 'Mistral':                                                                                                                                                                              
+    elif llm_type == 'Mistral':
         llm = ChatMistralAI(model_name=model, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])                                                                                                 
     elif llm_type == 'OpenAI':                                                                                                                                                                               
         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, api_key=os.environ['OPENAI_API_KEY'])                                                                                                     
