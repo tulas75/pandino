@@ -12,6 +12,7 @@ cache/
 exports/
 .env
 tmp/
+sql
 
 # Compiled Java class files
 *.class

@@ -14,6 +14,9 @@ from langchain_openai import OpenAIEmbeddings
 #Import specific vector store database from their specific libraries
 from pinecone import Pinecone, ServerlessSpec
 
+import database
+from database import log_token_usage
+
 load_dotenv()  # Load environment variables from .env file
 
 from typing import List
@@ -34,10 +37,10 @@ class CompletionResponse:
         self.answer = answer
 
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
-     emb_llm_type = "OpenAI"
-     llm_type = "OpenAI" 
-     model = "gpt-4o-mini"
-     emb_model ="text-embedding-ada-002"
+     emb_llm_type = "Mistral"
+     llm_type = "Groq" 
+     model = "llama-3.1-8b-instant"
+     emb_model ="mistral-embed"
      logging.info(f"Starting chat completion with llm_type: {llm_type}, model: {model}")                                                                                                                      
      if len(req.chat) % 2 == 0:                                                                                                                                                                               
          logging.error("Chat completion error: chat must be a list of user,assistant messages ending with a user message")                                                                                    
@@ -81,7 +84,11 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
                                                                                                                                                                                                               
      try:                                                                                                                                                                                                     
          resp = llm.invoke(messages)                                                                                                                                                                          
-         print(resp)                                                                                                                                                                                          
+         token_usage = resp.response_metadata.get('token_usage',{})
+         token_in = token_usage.get('prompt_tokens',0)
+         token_out = token_usage.get('completion_tokens',0)
+         user_id = 2
+         log_token_usage(user_id=user_id, token_input=token_in, token_output=token_out, model=model, provider=llm_type)
          return CompletionResponse(answer=resp.content)                                                                                                                                                       
      except Exception as e:                                                                                                                                                                                   
          logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
@@ -206,12 +213,3 @@ def reply_to_prompt(prompt):
     except Exception as e:                                                                                                                                                                                   
          logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
          return CompletionResponse(error=f"Error in chat completion: {str(e)}")
-    #try:
-    #    response = openai.ChatCompletion.create(
-    #        model="gpt-3.5-turbo",  # Replace with your completion model
-    #        messages=messages
-    #    )
-    #   return response.choices[0].message.content
-    #except openai.OpenAIError as e:
-    #    raise Exception(f"Error computing chat completion: {e}")
-
