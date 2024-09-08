@@ -37,10 +37,11 @@ class CompletionResponse:
         self.answer = answer
 
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
-     emb_llm_type = "Mistral"
+     emb_llm_type = "OpenAI"
      llm_type = "Groq" 
      model = "llama-3.1-8b-instant"
-     emb_model ="mistral-embed"
+     #emb_model ="mistral-embed"
+     emb_model ="text-embedding-ada-002"
      logging.info(f"Starting chat completion with llm_type: {llm_type}, model: {model}")                                                                                                                      
      if len(req.chat) % 2 == 0:                                                                                                                                                                               
          logging.error("Chat completion error: chat must be a list of user,assistant messages ending with a user message")                                                                                    
@@ -161,7 +162,7 @@ def connect_to_pinecone (index_name: str):
 def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namespace: str, emb_llm_type: str, model: str) -> tuple:
     logging.info(f"Finding similar paragraphs for text: {text[:50]}...")
     try:
-        index = connect_to_pinecone("langchain-test-index")
+        index = connect_to_pinecone("index")
         logging.info("Connected to Pinecone index")
         vec = embed(emb_llm_type, model, text)
         logging.info("Text embedded successfully")
@@ -188,9 +189,8 @@ def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namesp
         return [], [], str(e)
 
 def reply_to_prompt(prompt):
-
     llm_type = "Groq"                                                                                                                                                                        
-    model = "llama-3.1-70b-versatile"
+    model = "llama-3.1-8b-instant"
     messages = [
         {"role": "system", "content": "Sei un esperto di monitoraggio e valutazione che supporta le Organizzazioni non governative a scrivere il proprio bilancio sociale."},
         {"role": "user", "content": prompt}
@@ -208,7 +208,13 @@ def reply_to_prompt(prompt):
                                                                                                                                                                                                               
     try:                                                                                                                                                                                                     
         resp = llm.invoke(messages)
-        print (resp.content)
+        token_usage = resp.response_metadata.get('token_usage',{})
+        #print (token_usage)
+        token_in = token_usage.get('prompt_tokens',0)
+        token_out = token_usage.get('completion_tokens',0)
+        user_id = 2
+        log_token_usage(user_id=user_id, token_input=token_in, token_output=token_out, model=model, provider=llm_type)
+        #print (resp.content)
         return CompletionResponse(answer=resp.content)
     except Exception as e:                                                                                                                                                                                   
          logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
