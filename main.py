@@ -78,12 +78,12 @@ def completion_handler():
         )
 
         resp = complete_chat(chat_request)
-        print(resp)
+        #print(resp)
         
         if isinstance(resp, CompletionResponse):
             if resp.error:
                 return jsonify({"error": f"Chat completion error: {resp.error}"}), 400
-            return jsonify({"answer": resp.answer})
+            return jsonify({"answer": resp.answer,"paragraphs": resp.paragraphs, "similarities":resp.similarities})
         elif resp is None:
             return jsonify({"error": "No response from chat completion"}), 500
         else:

@@ -65,13 +65,13 @@ def choose_llm(llm_type, model, temperature=0, seed=26, base_url=None, api_key=N
         raise ValueError(f"Unsupported llm_type: {llm_type}")
 
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
-     #emb_llm_type = "OpenAI"
-     emb_llm_type = "Ollama"
-     llm_type = "Ollama" 
-     model = "gemma2:2b"
+     emb_llm_type = "OpenAI"
+     #emb_llm_type = "Ollama"
+     llm_type = "Groq" 
+     model = "llama-3.1-8b-instant"
      #emb_model ="mistral-embed"
-     #emb_model ="text-embedding-ada-002"
-     emb_model = "jeffh/intfloat-multilingual-e5-large:f16"
+     emb_model ="text-embedding-ada-002"
+     #emb_model = "jeffh/intfloat-multilingual-e5-large:f16"
      #emb_model = "bge-m3:latest"
 
      logging.info(f"Starting chat completion with llm_type: {llm_type}, model: {model}")                                                                                                                      
@@ -113,7 +113,9 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
          token_out = token_usage.get('completion_tokens',0)
          user_id = 2
          log_token_usage(user_id=user_id, token_input=token_in, token_output=token_out, model=model, provider=llm_type)
-         return CompletionResponse(answer=resp.content)                                                                                                                                                       
+         return CompletionResponse(answer=resp.content,
+                                   paragraphs=paragraphs,
+                                   similarities=similarities)                                                                                                                                                       
      except Exception as e:                                                                                                                                                                                   
          logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
          return CompletionResponse(error=f"Error in chat completion: {str(e)}")
@@ -123,11 +125,6 @@ def embed(emb_llm_type, model, text):
     logging.debug(f"Text to embed (first 50 chars): {text[:50]}...")
 
     embeddings = choose_emb_model(emb_llm_type, model)
-
-    hf_token = os.getenv("HF_TOKEN")
-    if hf_token:
-        os.environ["HF_TOKEN"] = hf_token
-        logging.info("HF_TOKEN set in environment")
 
     try:
         logging.info("Attempting to embed query")
@@ -153,7 +150,7 @@ def connect_to_pinecone (index_name: str):
 def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namespace: str, emb_llm_type: str, model: str) -> tuple:
     logging.info(f"Finding similar paragraphs for text: {text[:50]}...")
     try:
-        index = connect_to_pinecone("langchain-test-index")
+        index = connect_to_pinecone("index")
         logging.info("Connected to Pinecone index")
         vec = embed(emb_llm_type, model, text)
         logging.info("Text embedded successfully")
