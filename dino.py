@@ -13,3 +13,5 @@ def dino_authenticate(graphql_url, auth_token):
         return None
     except json.JSONDecodeError as e:
         return f"Error decoding dino response: {e}"
+    
+
