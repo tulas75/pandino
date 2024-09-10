@@ -38,6 +38,32 @@ class CompletionResponse:
         self.similarities = similarities
         self.answer = answer
 
+def choose_llm(llm_type, model, temperature=0, seed=26, base_url=None, api_key=None):
+    """
+    Choose and initialize the appropriate LLM based on the provided type and model.
+
+    :param llm_type: Type of the LLM (e.g., 'Groq', 'Deepseek', 'Mistral', 'OpenAI', 'Ollama')
+    :param model: Model name
+    :param temperature: Temperature for the model
+    :param seed: Seed for the model
+    :param base_url: Base URL for the model (if applicable)
+    :param api_key: API key for the model
+    :return: Initialized LLM instance
+    """
+    if llm_type == 'Groq':
+        model_kwargs = {'seed': seed}
+        return ChatGroq(model_name=model, temperature=temperature, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)
+    elif llm_type == 'Deepseek':
+        return ChatOpenAI(model_name=model, temperature=temperature, seed=seed, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])
+    elif llm_type == 'Mistral':
+        return ChatMistralAI(model_name=model, temperature=temperature, seed=seed, api_key=os.environ['MISTRAL_API_KEY'])
+    elif llm_type == 'OpenAI':
+        return ChatOpenAI(model_name=model, temperature=temperature, seed=seed, api_key=os.environ['OPENAI_API_KEY'])
+    elif llm_type == 'Ollama':
+        return ChatOpenAI(model_name=model, temperature=temperature, base_url='http://127.0.0.1:11434/v1', api_key='ollama')
+    else:
+        raise ValueError(f"Unsupported llm_type: {llm_type}")
+
 def complete_chat(req: CompletionRequest, llm_type=None, model=None):                                                                                                                                        
      #emb_llm_type = "OpenAI"
      emb_llm_type = "Ollama"
@@ -78,19 +104,8 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
          role = "user" if i % 2 == 0 else "assistant"                                                                                                                                                         
          messages.append({"role": role, "content": msg})                                                                                                                                                      
                                                                                                                                                                                                               
-     # Initialize the language model based on the provided type                                                                                                                                               
-     if llm_type == 'Groq': 
-         model_kwargs = {'seed': 26}
-         llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)
-     elif llm_type == 'Deepseek': 
-         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])
-     elif llm_type == 'Ollama':
-         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='http://127.0.0.1:11434/v1', api_key='ollama')
-     elif llm_type == 'Mistral':                                                                                                                                                                              
-         llm = ChatMistralAI(model_name=model, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])                                                                                                 
-     elif llm_type == 'OpenAI':                                                                                                                                                                               
-         llm = ChatOpenAI(model_name=model, temperature=0, seed=26, api_key=os.environ['OPENAI_API_KEY'])                                                                                                     
-                                                                                                                                                                                                              
+     llm = choose_llm(llm_type, model)
+
      try:                                                                                                                                                                                                     
          resp = llm.invoke(messages)                                                                                                                                                                          
          token_usage = resp.response_metadata.get('token_usage',{})
@@ -104,51 +119,10 @@ def complete_chat(req: CompletionRequest, llm_type=None, model=None):
          return CompletionResponse(error=f"Error in chat completion: {str(e)}")
 
 def embed(emb_llm_type, model, text):
-    embeddings = None
     logging.info(f"Attempting to embed text with {emb_llm_type} model: {model}")
     logging.debug(f"Text to embed (first 50 chars): {text[:50]}...")
 
-    # Initialize the language model based on the provided type
-    if emb_llm_type == 'Mistral':
-        mistralai_api_key = os.getenv("MISTRAL_API_KEY")
-        if not mistralai_api_key:
-            logging.error("MISTRAL_API_KEY environment variable is not set")
-            raise ValueError("MISTRAL_API_KEY environment variable is not set")
-        try:
-            embeddings = MistralAIEmbeddings(
-                model=model,
-                api_key=mistralai_api_key,
-            )
-            logging.info("MistralAIEmbeddings initialized successfully")
-        except Exception as e:
-            logging.error(f"Error initializing MistralAIEmbeddings: {str(e)}")
-            raise ValueError(f"Error initializing MistralAIEmbeddings: {str(e)}")
-    elif emb_llm_type == 'Ollama':
-        try:
-            embeddings = OllamaEmbeddings(
-                model=model
-            )
-            logging.info("OllamaEmbeddings initialized successfully")
-        except Exception as e:
-            logging.error(f"Error initializing OllamaEmbeddings: {str(e)}")
-            raise ValueError(f"Error initializing OllamaEmbeddings: {str(e)}")
-    elif emb_llm_type == 'OpenAI':
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not openai_api_key:
-            logging.error("OPENAI_API_KEY environment variable is not set")
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
-        try:
-            embeddings = OpenAIEmbeddings(
-                model=model,
-                api_key=openai_api_key,
-            )
-            logging.info("OpenAIEmbeddings initialized successfully")
-        except Exception as e:
-            logging.error(f"Error initializing OpenAIEmbeddings: {str(e)}")
-            raise ValueError(f"Error initializing OpenAIEmbeddings: {str(e)}")
-    else:
-        logging.error(f"Unsupported llm_type: {emb_llm_type}")
-        raise ValueError(f"Unsupported llm_type: {emb_llm_type}")
+    embeddings = choose_emb_model(emb_llm_type, model)
 
     hf_token = os.getenv("HF_TOKEN")
     if hf_token:
@@ -206,34 +180,48 @@ def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namesp
         return [], [], str(e)
 
 def reply_to_prompt(prompt):
-    llm_type = "Ollama"                                                                                                                                                                        
+    llm_type = "Ollama"
     model = "gemma2:2b"
     messages = [
         {"role": "system", "content": "Sei un esperto di monitoraggio e valutazione che supporta le Organizzazioni non governative a scrivere il proprio bilancio sociale."},
         {"role": "user", "content": prompt}
     ]
-    # Initialize the language model based on the provided type                                                                                                                                               
-    if llm_type == 'Groq':                                                                                                                                                                                   
-        model_kwargs = {'seed': 26}                                                                                                                                                                          
-        llm = ChatGroq(model_name=model, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)                                                                                       
-    elif llm_type == 'Deepseek':                                                                                                                                                                             
-        llm = ChatOpenAI(model_name=model, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])                                                              
-    elif llm_type == 'Mistral':
-        llm = ChatMistralAI(model_name=model, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])                                                                                                 
-    elif llm_type == 'OpenAI':                                                                                                                                                                               
-        llm = ChatOpenAI(model_name=model, temperature=0, seed=26, api_key=os.environ['OPENAI_API_KEY'])                                                                                                     
-    elif llm_type == 'Ollama':
-        llm = ChatOpenAI(model_name=model, temperature=0.3, base_url='http://127.0.0.1:11434/v1', api_key='ollama')                                                                                                                                                                                                              
-    try:                                                                                                                                                                                                     
+
+    llm = choose_llm(llm_type, model, temperature=0.3)
+
+    try:
         resp = llm.invoke(messages)
         token_usage = resp.response_metadata.get('token_usage',{})
-        #print (token_usage)
         token_in = token_usage.get('prompt_tokens',0)
         token_out = token_usage.get('completion_tokens',0)
         user_id = 2
         log_token_usage(user_id=user_id, token_input=token_in, token_output=token_out, model=model, provider=llm_type)
-        #print (resp.content)
         return CompletionResponse(answer=resp.content)
-    except Exception as e:                                                                                                                                                                                   
-         logging.error(f"Error in chat completion: {str(e)}")                                                                                                                                                 
-         return CompletionResponse(error=f"Error in chat completion: {str(e)}")
+    except Exception as e:
+        logging.error(f"Error in chat completion: {str(e)}")
+        return CompletionResponse(error=f"Error in chat completion: {str(e)}")
+def choose_emb_model(emb_llm_type, model):
+    """
+    Choose and initialize the appropriate embeddings model based on the provided type and model.
+
+    :param emb_llm_type: Type of the embeddings model (e.g., 'Mistral', 'Ollama', 'OpenAI')
+    :param model: Model name
+    :return: Initialized embeddings model instance
+    """
+    if emb_llm_type == 'Mistral':
+        mistralai_api_key = os.getenv("MISTRAL_API_KEY")
+        if not mistralai_api_key:
+            logging.error("MISTRAL_API_KEY environment variable is not set")
+            raise ValueError("MISTRAL_API_KEY environment variable is not set")
+        return MistralAIEmbeddings(model=model, api_key=mistralai_api_key)
+    elif emb_llm_type == 'Ollama':
+        return OllamaEmbeddings(model=model)
+    elif emb_llm_type == 'OpenAI':
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            logging.error("OPENAI_API_KEY environment variable is not set")
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        return OpenAIEmbeddings(model=model, api_key=openai_api_key)
+    else:
+        logging.error(f"Unsupported emb_llm_type: {emb_llm_type}")
+        raise ValueError(f"Unsupported emb_llm_type: {emb_llm_type}")

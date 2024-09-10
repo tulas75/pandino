@@ -13,13 +13,7 @@ from dino import dino_authenticate
 
 import ai 
 from ai import complete_chat, CompletionResponse
-from ai import reply_to_prompt
-
-# Import specific chat models from their respective libraries
-from langchain_groq.chat_models import ChatGroq
-from langchain_openai import ChatOpenAI
-from langchain_mistralai import ChatMistralAI
-
+from ai import reply_to_prompt, choose_llm
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -121,16 +115,7 @@ def analyst():
     # Read the data from the provided CSV file
     data = pd.read_csv(data_param)
 
-    # Initialize the language model based on the provided type
-    if llm_type == 'Groq':
-        model_kwargs = {'seed': 26}
-        llm = ChatGroq(model_name=model_name, temperature=0, api_key=os.environ['GROQ_API_KEY'], model_kwargs=model_kwargs)
-    elif llm_type == 'Deepseek':
-        llm = ChatOpenAI(model_name=model_name, temperature=0, seed=26, base_url='https://api.deepseek.com', api_key=os.environ['DEEPSEEK_API_KEY'])
-    elif llm_type == 'Mistral':
-        llm = ChatMistralAI(model_name=model_name, temperature=0, seed=26, api_key=os.environ['MISTRAL_API_KEY'])
-    elif llm_type == 'OpenAI':
-        llm = ChatOpenAI(model_name=model_name, temperature=0, seed=26, api_key=os.environ['OPENAI_API_KEY'])
+    llm = choose_llm(llm_type, model_name)
 
     # Initialize the agent with the data and configuration
     agent = Agent(data, config={"llm": llm, "open_charts": False})
