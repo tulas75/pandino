@@ -15,6 +15,8 @@ from langchain_ollama import OllamaEmbeddings
 
 #Import specific vector store database from their specific libraries
 from pinecone import Pinecone, ServerlessSpec
+from langchain_pinecone import PineconeVectorStore
+from langchain_postgres import PGVector
 
 import database
 from database import log_token_usage
@@ -147,13 +149,49 @@ def connect_to_pinecone (index_name: str):
     index = pc.Index(index_name)
     return index
 
+def connect_to_vector_db (db_name: str, index_name: str, emb_llm_type: str, emb_model):
+    if db_name == 'pinecone':
+        pinecone_api_key = os.environ.get("PINECONE_API_KEY")
+        pc = Pinecone(api_key=pinecone_api_key)
+        index = pc.Index(index_name)
+        embeddings = choose_emb_model (emb_llm_type, emb_model)
+        vector_store = PineconeVectorStore(index=index, embedding=embeddings)
+        logging.info("VectorStore created")
+        return vector_store
+    elif db_name == 'pgvector':
+        embeddings = choose_emb_model (emb_llm_type, emb_model)
+        connection = "postgresql+psycopg://langchain:langchain@localhost:6024/langchain"
+        vector_store = PGVector(embeddings=embeddings,collection_name=index_name,connection=connection,use_jsonb=True)
+        return vector_store
+
 def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namespace: str, emb_llm_type: str, model: str) -> tuple:
     logging.info(f"Finding similar paragraphs for text: {text[:50]}...")
+    
     try:
-        index = connect_to_pinecone("index")
-        logging.info("Connected to Pinecone index")
+        
+        """
+        db_name='pinecone'
+        index_name='index'
+        emb_llm_type ='OpenAI'
+        emb_model='text-embedding-ada-002'
+
+        vector_store = connect_to_vector_db(db_name=db_name,index_name=index_name,emb_llm_type=emb_llm_type,emb_model=emb_model)
+        print(vector_store)
+        logging.info("Connected to Vector Database")
+        
+        try:
+            resp = vector_store.similarity_search_with_relevance_scores (text, k=top_k,score_threshold=min_similarity)
+            print(resp)
+            for res, score in resp:
+                print(f"* [SIM={score:3f}] {res.page_content} [{res.metadata}]")
+        except Exception as e:
+            logging.error(f"Error querying the vector database: {str(e)}")
+            return [], [], str(e)
+            """
+        
         vec = embed(emb_llm_type, model, text)
         logging.info("Text embedded successfully")
+        index = connect_to_pinecone("index")
         resp = index.query(
             vector=vec, 
             top_k=top_k, 
@@ -161,14 +199,18 @@ def find_similar_paragraphs(text: str, top_k: int, min_similarity: float, namesp
             namespace=namespace,
             min_similarity=min_similarity
         )
-        logging.info(f"Pinecone query completed, found {len(resp.matches)} matches")
+        
+        logging.info(f"Vector Database query completed, found {len(resp.matches)} matches")
         
         paragraphs = []
         similarities = []
-        for vec in resp.matches:
-            if vec.score >= min_similarity:
-                paragraphs.append(vec.metadata["text"])
-                similarities.append(vec.score)
+        if hasattr(resp, 'matches'):
+                for vec in resp.matches:
+                    if vec.score >= min_similarity:
+                        paragraphs.append(vec.metadata["text"])
+                        similarities.append(vec.score)
+        else:
+            logging.warning("The response from the vector database does not contain 'matches' attribute.")
         
         logging.info(f"Filtered to {len(paragraphs)} paragraphs above minimum similarity")
         return paragraphs, similarities, None
