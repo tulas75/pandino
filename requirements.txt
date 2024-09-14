@@ -11,3 +11,4 @@ cryptography
 numpy==1.26.4
 scikit-learn
 seaborn
+psycopg2-binary
