@@ -4,8 +4,6 @@ from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
 import pandas as pd
 from pandasai import Agent
-import database
-from database import validate_api_key
 from agent_manager import getAgent, createAgent, deleteAgent
 from file_manager import isImageFilePath, fileToBase64
 
@@ -13,6 +11,12 @@ from file_manager import isImageFilePath, fileToBase64
 from langchain_groq.chat_models import ChatGroq
 from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
+
+# Import function from ai and database
+import database
+from database import validate_api_key
+import ai
+from ai import choose_llm
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -99,46 +103,16 @@ def startChat():
 
     # Read the data from the provided CSV file
     data = pd.read_csv(request_file, sep=",")
-
     # Initialize the language model based on the provided type
-    if llm_type == "Groq":
-        model_kwargs = {"seed": 26}
-        llm = ChatGroq(
-            model_name=model_name,
-            temperature=0,
-            api_key=os.environ["GROQ_API_KEY"],
-            model_kwargs=model_kwargs,
-        )
-    elif llm_type == "Deepseek":
-        llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=0,
-            seed=26,
-            base_url="https://api.deepseek.com",
-            api_key=os.environ["DEEPSEEK_API_KEY"],
-        )
-    elif llm_type == "Mistral":
-        llm = ChatMistralAI(
-            model_name=model_name,
-            temperature=0,
-            seed=26,
-            api_key=os.environ["MISTRAL_API_KEY"],
-        )
-    elif llm_type == "OpenAI":
-        llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=0,
-            seed=26,
-            api_key=os.environ["OPENAI_API_KEY"],
-        )
+    llm = choose_llm(llm_type, model_name)
 
     # Initialize the agent with the data and configuration
     try:
         agent = createAgent(api_key, data, llm, user_name)
         agentResponse = {"Agent active": agent.conversation_id}
 
-        suggestionsQuestion = f"""This is my data: {data}. What kind of questions should I ask about it? Please respond in a readable html format,
-            with no asterisks and adding a line break after each question."""
+        suggestionsQuestion = f"""Given this pandas dataframe {data}. Try to understand the nature of the data and suggest me what kind of analysis should I ask for. Explain in details your answers and do any suggestions of possible question that I could ask. DO not suggest any python code. Please reply in a readable html format,with no asterisks and adding a line break after each paragraph."""
+#        suggestionsQuestion = f"""i Given this dataframe id,user_data_ref_id,created_at,District,Sub County,Settlement,Parish,Village,Point of care,Patient id number,Nationality,Age,Gender,Disability Status,Disabilities,Pregnancy,Chief complain/Complaint of the patient,Eyes Checked,Visual acuity (VA),CF (Counting fingers)(Visual acuity (VA)),HM (Hand motion)(CF (Counting fingers)(Visual acuity (VA))),LP (Light perception)(HM (Hand motion)(CF (Counting fingers)(Visual acuity (VA)))),IOP/Intra-ocular pressure (0-21 mmHg),Eye Lid,Specify Abnormal,Conjunctiva,Cornea,Anterior chamber,Lens,Fundus,Specify Other,Pupil,Describe Irregular,Diagnosis,Any medications/Treatment,“If Other, specify”,Visual acuity (VA),CF (Counting fingers)(Visual acuity (VA)),HM (Hand motion)(CF (Counting fingers)(Visual acuity (VA))),LP (Light perception)(HM (Hand motion)(CF (Counting fingers)(Visual acuity (VA)))),IOP/Intra-ocular pressure,Eye Lid,Specify Abnormal,Conjunctiva,Cornea,Anterior chamber,Lens,Fundus,Specify Other,Pupil,Describe Irregular,Diagnosis,Any medications/Treatment,“If Other, specify”,try to understand the nature of the data and suggest me what kind of analysis should I ask for. Explain in details your answers and do any suggestions of possible question that I could ask. DO not suggest any python code. Please reply in a readable html format,with no asterisks and adding a line break after each paragraph."""
         suggestionsResponse = llm.invoke(suggestionsQuestion)
         if suggestionsResponse and suggestionsResponse.content is not None:
             agentResponse.update({"suggested_questions": suggestionsResponse.content})
