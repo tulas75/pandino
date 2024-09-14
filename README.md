@@ -27,6 +27,8 @@ To install Pandino, follow these steps:
 3. Set up environment variables:
    Create a `.env` file in the project root and add the following variables:
    ```
+   PGHOST=pghost
+   ...
    GROQ_API_KEY=your_groq_api_key
    DEEPSEEK_API_KEY=your_deepseek_api_key
    MISTRAL_API_KEY=your_mistral_api_key
